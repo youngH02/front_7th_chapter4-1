@@ -13,21 +13,25 @@
 ### 기본과제 (Vanilla SSR & SSG)
 
 #### Express SSR 서버
-- [ ] Express 미들웨어 기반 서버 구현
-- [ ] 개발/프로덕션 환경 분기 처리
+
+- [X] Express 미들웨어 기반 서버 구현
+- [X] 개발/프로덕션 환경 분기 처리
 - [ ] HTML 템플릿 치환 (`<!--app-html-->`, `<!--app-head-->`)
 
 #### 서버 사이드 렌더링
+
 - [ ] 서버에서 동작하는 Router 구현
 - [ ] 서버 데이터 프리페칭 (상품 목록, 상품 상세)
 - [ ] 서버 상태관리 초기화
 
 #### 클라이언트 Hydration
+
 - [ ] `window.__INITIAL_DATA__` 스크립트 주입
 - [ ] 클라이언트 상태 복원
 - [ ] 서버-클라이언트 데이터 일치
 
 #### Static Site Generation
+
 - [ ] 동적 라우트 SSG (상품 상세 페이지들)
 - [ ] 빌드 타임 페이지 생성
 - [ ] 파일 시스템 기반 배포
@@ -35,16 +39,19 @@
 ### 심화과제 (React SSR & SSG)
 
 #### React SSR
+
 - [ ] `renderToString` 서버 렌더링
 - [ ] TypeScript SSR 모듈 빌드
 - [ ] Universal React Router (서버/클라이언트 분기)
 - [ ] React 상태관리 서버 초기화
 
 #### React Hydration
+
 - [ ] Hydration 불일치 방지
 - [ ] 클라이언트 상태 복원
 
 #### Static Site Generation
+
 - [ ] 동적 라우트 SSG (상품 상세 페이지들)
 - [ ] 빌드 타임 페이지 생성
 - [ ] 파일 시스템 기반 배포

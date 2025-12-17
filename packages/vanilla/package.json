@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173",
-    "dev:ssr": "PORT=5174 node server.js",
+    "dev:ssr": "PORT=5174 nodemon server.js",
     "build:client": "rm -rf ./dist/vanilla && vite build --outDir ./dist/vanilla && cp ./dist/vanilla/index.html ./dist/vanilla/404.html",
     "build:client-for-ssg": "rm -rf ../../dist/vanilla && vite build --outDir ../../dist/vanilla",
     "build:server": "vite build --outDir ./dist/vanilla-ssr --ssr src/main-server.js",
@@ -38,6 +38,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@vitest/coverage-v8": "latest",
     "@vitest/ui": "^2.1.8",
+    "concurrently": "latest",
     "eslint": "^9.16.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
@@ -47,10 +48,10 @@
     "jsdom": "^25.0.1",
     "lint-staged": "^15.2.11",
     "msw": "^2.10.2",
+    "nodemon": "^3.1.11",
     "prettier": "^3.4.2",
     "vite": "npm:rolldown-vite@latest",
-    "vitest": "latest",
-    "concurrently": "latest"
+    "vitest": "latest"
   },
   "msw": {
     "workerDirectory": [
