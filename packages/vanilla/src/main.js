@@ -4,6 +4,8 @@ import { registerAllEvents } from "./events";
 import { loadCartFromStorage } from "./services";
 import { router } from "./router";
 import { BASE_URL } from "./constants.js";
+import { productStore } from "./stores/productStore.js";
+import { PRODUCT_ACTIONS } from "./stores/actionTypes.js";
 
 const enableMocking = () =>
   import("./mocks/browser.js").then(({ worker }) =>
@@ -15,7 +17,26 @@ const enableMocking = () =>
     }),
   );
 
-function main() {
+async function main() {
+  // 🔑 Hydration: 서버에서 받은 초기 데이터 복원
+  const initialData = window.__INITIAL_DATA__;
+
+  if (initialData) {
+    console.log("🎉 Hydration: Restoring server data", initialData);
+
+    // productStore에 서버 데이터 복원
+    productStore.dispatch({
+      type: PRODUCT_ACTIONS.SETUP,
+      payload: initialData,
+    });
+
+    // 메모리 정리
+    delete window.__INITIAL_DATA__;
+    console.log("✅ Hydration complete - Server data restored");
+  } else {
+    console.log("⚠️ No initial data found - Running in CSR mode");
+  }
+
   registerAllEvents();
   registerGlobalEvents();
   loadCartFromStorage();

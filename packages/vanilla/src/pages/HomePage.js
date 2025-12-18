@@ -7,6 +7,16 @@ import { PageWrapper } from "./PageWrapper.js";
 export const HomePage = withLifecycle(
   {
     onMount: () => {
+      const state = productStore.getState();
+
+      // Hydration 체크: 이미 데이터가 있으면 스킵
+      if (state.products.length > 0 && state.status === "done") {
+        console.log("⚡ Using hydrated data - Skipping API call");
+        return;
+      }
+
+      // 데이터 없으면 로드 (CSR)
+      console.log("📡 Loading data - CSR mode");
       loadProductsAndCategories();
     },
     watches: [
