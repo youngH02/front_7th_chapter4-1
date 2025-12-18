@@ -12,7 +12,7 @@ export default defineConfig({
     command: "pnpm run serve:test",
     port: 4173,
     reuseExistingServer: !process.env.CI,
-    stdout: "pipe",
-    stderr: "pipe",
+    stdout: "inherit",
+    stderr: "inherit",
   },
 });

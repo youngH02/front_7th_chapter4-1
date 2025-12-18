@@ -75,7 +75,15 @@ export class Router {
 
   #findRoute(url = window.location.pathname) {
     const { pathname } = new URL(url, window.location.origin);
+    let fallbackRoute = null;
+
     for (const [routePath, route] of this.#routes) {
+      // Check for catch-all fallback pattern
+      if (routePath === ".*") {
+        fallbackRoute = route;
+        continue;
+      }
+
       const match = pathname.match(route.regex);
       if (match) {
         // 매치된 파라미터들을 객체로 변환
@@ -91,6 +99,16 @@ export class Router {
         };
       }
     }
+
+    // Return fallback route if no exact match found
+    if (fallbackRoute) {
+      return {
+        ...fallbackRoute,
+        params: {},
+        path: ".*",
+      };
+    }
+
     return null;
   }
 

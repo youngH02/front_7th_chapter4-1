@@ -31,11 +31,12 @@ export function getUniqueCategories(items) {
 export function filterProducts(products, query) {
   let filtered = [...products];
 
-  // 검색어 필터링
-  if (query.search) {
-    const searchTerm = query.search.toLowerCase();
+  // 검색어 필터링 (search 또는 query 파라미터 지원)
+  const searchTerm = query.search || query.query;
+  if (searchTerm) {
+    const term = searchTerm.toLowerCase();
     filtered = filtered.filter(
-      (item) => item.title.toLowerCase().includes(searchTerm) || item.brand.toLowerCase().includes(searchTerm),
+      (item) => item.title.toLowerCase().includes(term) || item.brand.toLowerCase().includes(term),
     );
   }
 
@@ -47,25 +48,24 @@ export function filterProducts(products, query) {
     filtered = filtered.filter((item) => item.category2 === query.category2);
   }
 
-  // 정렬
-  if (query.sort) {
-    switch (query.sort) {
-      case "price_asc":
-        filtered.sort((a, b) => parseInt(a.lprice) - parseInt(b.lprice));
-        break;
-      case "price_desc":
-        filtered.sort((a, b) => parseInt(b.lprice) - parseInt(a.lprice));
-        break;
-      case "name_asc":
-        filtered.sort((a, b) => a.title.localeCompare(b.title, "ko"));
-        break;
-      case "name_desc":
-        filtered.sort((a, b) => b.title.localeCompare(a.title, "ko"));
-        break;
-      default:
-        // 기본은 가격 낮은 순
-        filtered.sort((a, b) => parseInt(a.lprice) - parseInt(b.lprice));
-    }
+  // 정렬 (기본값은 price_asc)
+  const sortType = query.sort || "price_asc";
+  switch (sortType) {
+    case "price_asc":
+      filtered.sort((a, b) => parseInt(a.lprice) - parseInt(b.lprice));
+      break;
+    case "price_desc":
+      filtered.sort((a, b) => parseInt(b.lprice) - parseInt(a.lprice));
+      break;
+    case "name_asc":
+      filtered.sort((a, b) => a.title.localeCompare(b.title, "ko"));
+      break;
+    case "name_desc":
+      filtered.sort((a, b) => b.title.localeCompare(a.title, "ko"));
+      break;
+    default:
+      // 기본은 가격 낮은 순
+      filtered.sort((a, b) => parseInt(a.lprice) - parseInt(b.lprice));
   }
 
   return filtered;

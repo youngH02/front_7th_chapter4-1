@@ -4,7 +4,15 @@
  * @param {Storage} storage - 기본값은 localStorage
  * @returns {Object} { get, set, reset }
  */
-export const createStorage = (key, storage = window.localStorage) => {
+export const createStorage = (key, storage = typeof window !== "undefined" ? window.localStorage : null) => {
+  // SSR 환경에서는 no-op 반환
+  if (!storage) {
+    return {
+      get: () => null,
+      set: () => {},
+      reset: () => {},
+    };
+  }
   const get = () => {
     try {
       const item = storage.getItem(key);

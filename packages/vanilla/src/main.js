@@ -22,8 +22,6 @@ async function main() {
   const initialData = window.__INITIAL_DATA__;
 
   if (initialData) {
-    console.log("🎉 Hydration: Restoring server data", initialData);
-
     // productStore에 서버 데이터 복원
     productStore.dispatch({
       type: PRODUCT_ACTIONS.SETUP,
@@ -32,9 +30,6 @@ async function main() {
 
     // 메모리 정리
     delete window.__INITIAL_DATA__;
-    console.log("✅ Hydration complete - Server data restored");
-  } else {
-    console.log("⚠️ No initial data found - Running in CSR mode");
   }
 
   registerAllEvents();

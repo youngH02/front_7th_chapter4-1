@@ -237,12 +237,16 @@ function ProductDetail({ product, relatedProducts = [] }) {
 export const ProductDetailPage = withLifecycle(
   {
     onMount: () => {
-      loadProductDetailForPage(router.params.id);
+      // SSR에서 이미 데이터가 로드되어 있으면 스킵
+      const state = productStore.getState();
+      if (!state.currentProduct || state.currentProduct.productId !== router.params.id) {
+        loadProductDetailForPage(router.params.id);
+      }
     },
     watches: [() => [router.params.id], () => loadProductDetailForPage(router.params.id)],
   },
   () => {
-    const { currentProduct: product, relatedProducts = [], error, loading } = productStore.getState();
+    const { currentProduct: product, relatedProducts = [], error } = productStore.getState();
 
     return PageWrapper({
       headerLeft: `
@@ -256,11 +260,11 @@ export const ProductDetailPage = withLifecycle(
           <h1 class="text-lg font-bold text-gray-900">상품 상세</h1>
         </div>
       `.trim(),
-      children: loading
-        ? loadingContent
-        : error && !product
+      children: product
+        ? ProductDetail({ product, relatedProducts })
+        : error
           ? ErrorContent({ error })
-          : ProductDetail({ product, relatedProducts }),
+          : loadingContent,
     });
   },
 );

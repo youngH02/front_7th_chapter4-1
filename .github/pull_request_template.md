@@ -14,9 +14,9 @@
 
 #### Express SSR 서버
 
-- [X] Express 미들웨어 기반 서버 구현
-- [X] 개발/프로덕션 환경 분기 처리
-- [X] HTML 템플릿 치환 (`<!--app-html-->`, `<!--app-head-->`)
+- [x] Express 미들웨어 기반 서버 구현
+- [x] 개발/프로덕션 환경 분기 처리
+- [x] HTML 템플릿 치환 (`<!--app-html-->`, `<!--app-head-->`)
 
 #### 서버 사이드 렌더링
 
@@ -58,24 +58,101 @@
 
 ## 아하! 모먼트 (A-ha! Moment)
 
-<!--
-과제를 진행하며 "아!" 하고 깨달음을 얻었던 순간이 있다면 공유해주세요.
-어떤 부분에서 어려움을 겪다가, 어떤 계기로 개념이 명확해졌나요?
--->
+### Router가 세 개인 이유
+
+처음에는 "왜 Router가 세 개나 필요하지?"라는 의문이 컸습니다. Express Router, ServerRouter, Client Router가 각각 어떤 역할을 하는지 헷갈렸는데, 직접 구현하면서 각자의 존재 이유를 명확히 이해했습니다.
+
+- **Express Router**: HTTP 요청을 받는 웹서버의 기본 기능
+- **ServerRouter**: SSR 시 URL 패턴 매칭과 페이지 선택 (window 없는 환경)
+- **Client Router**: 브라우저에서 SPA 전환 (History API 사용)
+
+특히 ServerRouter는 Node.js 환경에서 동작하기 때문에 `window`나 `history` 같은 브라우저 API를 사용할 수 없다는 점이 핵심이었습니다. 같은 "라우팅"이지만 환경이 다르면 완전히 다른 구현이 필요하다는 걸 체감했습니다.
+
+### Store 격리의 중요성
+
+서버에서 매 요청마다 Store를 초기화해야 하는 이유를 처음엔 이해하지 못했습니다. "전역 상태관리인데 왜 매번 리셋하지?"라고 생각했는데, 동시 요청 시나리오를 생각해보니 명확해졌습니다.
+
+```javascript
+// 요청 A: 사용자 1이 상품 123 조회
+productStore.dispatch({ type: "SET_PRODUCT", payload: product123 });
+
+// 요청 B: 사용자 2가 상품 456 조회 (동시)
+productStore.dispatch({ type: "SET_PRODUCT", payload: product456 });
+// → 사용자 1에게 상품 456이 보임! 😱
+```
+
+서버는 여러 사용자의 요청을 동시에 처리하기 때문에, 각 요청마다 독립적인 상태를 유지해야 합니다. 
+
+### Hydration의 본질
+
+Hydration이 단순히 "서버 HTML에 이벤트 붙이기"가 아니라는 걸 이해하는 데 시간이 걸렸습니다. 핵심은 **서버와 클라이언트가 정확히 같은 HTML을 생성해야 한다**는 점이었습니다.
+
+`window.__INITIAL_DATA__`를 통해 서버의 상태를 클라이언트로 전달하고, 클라이언트가 같은 상태로 렌더링해서 DOM 불일치를 방지하는 메커니즘이 직관적이지만, UI를 비교해야하는 FE의 한계인것처럼 느껴지기도 했습니다.
 
 ## 자유롭게 회고하기
 
-<!-- 여태까지는 정해진 템플릿을 기반으로 회고를 진행했습니다. 이번에는 자유롭게 회고해주세요. -->
+### Universal JavaScript의 매력과 함정
+
+같은 코드가 서버와 클라이언트에서 모두 동작한다는 게 매력적이면서도 조심스러웠습니다. 페이지 컴포넌트는 양쪽에서 실행되지만, 데이터 로딩 방식은 완전히 달라야 합니다.
+
+- 서버: `fs.readFileSync`로 파일 읽기
+- 클라이언트: `fetch`로 API 호출
+
+이 차이를 명확히 분리하지 않으면 런타임 에러가 발생합니다. "어디서 실행되는 코드인가?"를 항상 의식해야했습니다.
+
+### SSG의 효율성
+
+SSG를 구현하면서 "빌드 타임에 모든 페이지를 미리 만든다"는 개념이 얼마나 강력한지 체감했습니다. 서버 없이도 완전한 HTML을 제공할 수 있고, CDN으로 배포하면 최고의 성능을 낼 수 있습니다.
+
+다만 상품이 수천 개라면 빌드 시간이 문제가 될 수 있다는 점도 고민하게 되었습니다. "어떤 페이지를 SSG로, 어떤 페이지를 SSR로 처리할지" 전략적으로 선택하는 게 중요하다는 걸 배웠습니다.
 
 ## 리뷰 받고 싶은 내용
 
-<!--
-SSR/SSG 구현과 관련된 구체적인 피드백을 요청해주세요.
+### 1. ServerRouter의 URL 매칭 안정성
 
-구체적인 질문 예시:
-- "packages/vanilla/src/main-server.js의 라우터 매개변수 추출 로직에서 정규식 패턴이 복잡한 URL에도 안정적으로 동작할지 검토 부탁드립니다."
-- "React SSR에서 서버와 클라이언트의 상태 동기화 로직이 대용량 데이터에서도 성능상 문제없을지 조언 부탁드립니다."
-- "현재 구현한 SSG 빌드 과정이 상품 개수가 1000개 이상으로 늘어날 때도 효율적으로 동작할지, 최적화 방안이 있다면 제안해주세요."
-- "TypeScript SSR 모듈의 타입 정의에서 놓친 부분이나 더 안전하게 개선할 수 있는 부분이 있는지 검토해주세요."
-- "Universal Router 구현에서 메모리 누수나 성능 이슈 가능성은 없는지 확인 부탁드립니다."
--->
+`packages/vanilla/src/lib/ServerRouter.js`의 정규식 기반 URL 매칭 로직이 복잡한 쿼리 파라미터나 특수문자가 포함된 URL에서도 안정적으로 동작할지 검토 부탁드립니다. 특히 `/product/:id/` 패턴에서 `id`에 예상치 못한 값이 들어올 경우의 처리가 적절한지 확인해주세요.
+
+### 2. 서버/클라이언트 데이터 페칭 로직 중복
+
+현재 구조에서 데이터 페칭 로직이 서버(`serverApi.js`)와 클라이언트(`productApi.js`)에 중복으로 존재합니다:
+
+**서버 (serverApi.js)**:
+
+```javascript
+export async function getProductsFromFile(params) {
+  const items = await loadItems(); // fs.readFile
+  const filtered = filterProducts(items, params);
+  // 페이지네이션, 정렬 로직...
+}
+```
+
+**클라이언트 (productApi.js)**:
+
+```javascript
+export async function getProducts(params) {
+  const response = await fetch(`/api/products?${searchParams}`);
+  return await response.json();
+}
+```
+
+두 환경에서 같은 필터링/정렬 로직을 구현해야 하고, `main-server.js`에서도 라우트별로 데이터 로딩 로직이 반복됩니다. 이런 복잡한 구조가 SSR에서 불가피한 것인지, 아니면 더 효율적인 방법이 있는지 궁금합니다.
+
+### 3. SSG 빌드 최적화
+
+`packages/vanilla/static-site-generate.js`에서 모든 상품 페이지를 순차적으로 생성하는데, 상품이 1000개 이상으로 늘어날 경우 빌드 시간이 문제가 될 것 같습니다. 이런부분도 병렬처리가 가능한지, 또 실무에서 SSG를 사용하는지 궁금합니다.
+
+### 4. 라우트별 데이터 로딩 로직 구조화
+
+`main-server.js`의 `render` 함수에서 라우트별로 if-else 분기로 데이터를 로딩하는 구조가 라우트가 늘어날수록 복잡해질 것 같습니다:
+
+```javascript
+if (matched.path === "/") {
+  // 홈페이지 데이터 로딩
+  const [productsData, categories] = await Promise.all([...]);
+} else if (matched.path === "/product/:id/") {
+  // 상품 상세 데이터 로딩
+  const product = await getProductByIdFromFile(productId);
+}
+```
+
+Next.js의 `getServerSideProps`처럼 각 페이지 컴포넌트에 데이터 로딩 함수를 연결하는 패턴이 더 확장 가능할지, 현재 구조에서 개선 방안이 있을까요?

@@ -31,8 +31,10 @@ const mount = (page) => {
   const lifecycle = getPageLifecycle(page);
   if (lifecycle.mounted) return;
 
-  // 마운트 콜백들 실행
-  lifecycle.mount?.();
+  // 서버 환경에서는 마운트 콜백 실행 안 함
+  if (typeof window !== "undefined") {
+    lifecycle.mount?.();
+  }
   lifecycle.mounted = true;
   lifecycle.deps = [];
 };
@@ -63,6 +65,11 @@ export const withLifecycle = ({ onMount, onUnmount, watches } = {}, page) => {
   }
 
   return (...args) => {
+    // 서버 환경에서는 라이프사이클 로직 스킵
+    if (typeof window === "undefined") {
+      return page(...args);
+    }
+
     const wasNewPage = pageState.current !== page;
 
     // 이전 페이지 언마운트

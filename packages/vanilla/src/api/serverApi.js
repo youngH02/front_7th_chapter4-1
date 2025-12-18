@@ -2,11 +2,20 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { filterProducts, getUniqueCategories } from "../utils/productFilters.js";
+
 // ES Module에서 __dirname 만들기
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 // 1. items.json 파일 경로 찾기
-const itemsPath = path.join(__dirname, "../mocks/items.json");
+// src 환경과 dist 환경 모두 지원
+let itemsPath = path.join(__dirname, "../mocks/items.json");
+
+// dist 환경일 경우 경로 조정 (mocks가 같은 레벨에 있음)
+if (__dirname.includes("/dist/")) {
+  const altPath = path.join(__dirname, "./mocks/items.json");
+  itemsPath = altPath;
+}
 // 2. 파일 읽기
 export async function loadItems() {
   const data = await fs.readFile(itemsPath, "utf-8");

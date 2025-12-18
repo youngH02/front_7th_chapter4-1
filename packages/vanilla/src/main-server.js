@@ -2,97 +2,128 @@ import { ServerRouter } from "./lib/ServerRouter.js";
 import { getProductsFromFile, getProductByIdFromFile, getCategoriesFromFile } from "./api/serverApi.js";
 import { productStore, initialProductState } from "./stores/productStore.js";
 import { PRODUCT_ACTIONS } from "./stores/actionTypes.js";
-import { BASE_URL } from "./constants.js";
+import { HomePage, NotFoundPage, ProductDetailPage } from "./pages/index.js";
+import { router } from "./router/router.js";
 
 // 서버 라우터 설정
-const serverRouter = new ServerRouter(BASE_URL);
+const serverRouter = new ServerRouter("/");
 
-// 라우트 등록은 동적으로 (페이지 컴포넌트 import 문제 회피)
-const routes = {
-  "/": "HomePage",
-  "/product/:id/": "ProductDetailPage",
-};
+// 라우트 등록
+serverRouter.addRoute("/", "HomePage");
+serverRouter.addRoute("/product/:id/", "ProductDetailPage");
 
-Object.entries(routes).forEach(([path, name]) => {
-  serverRouter.addRoute(path, name);
-});
+/**
+ * URL에서 base path를 제거하는 함수
+ */
+function cleanBasePathFromUrl(url) {
+  let cleanUrl = url.split("?")[0]; // 쿼리 스트링 제거
+  const basePaths = ["/front_7th_chapter4-1/vanilla", "/front_7th_chapter4-1/vanilla/"];
+
+  for (const base of basePaths) {
+    if (cleanUrl.startsWith(base)) {
+      cleanUrl = cleanUrl.substring(base.length);
+      if (!cleanUrl.startsWith("/")) {
+        cleanUrl = "/" + cleanUrl;
+      }
+      break;
+    }
+  }
+
+  // 빈 문자열이면 홈페이지
+  return cleanUrl || "/";
+}
+
+/**
+ * 쿼리 파라미터를 디코딩하는 함수
+ */
+function decodeQueryParams(queryParams, passedQuery) {
+  const mergedQuery = { ...queryParams, ...passedQuery };
+  const decodedQuery = {};
+
+  for (const [key, value] of Object.entries(mergedQuery)) {
+    try {
+      decodedQuery[key] = decodeURIComponent(value);
+    } catch {
+      decodedQuery[key] = value; // 디코딩 실패 시 원본 사용
+    }
+  }
+
+  return decodedQuery;
+}
 
 /**
  * SSR 렌더링 함수
- * @param {string} url - 요청 URL
- * @param {Object} query - 쿼리 파라미터
- * @returns {Promise<{head: string, appHtml: string}>}
  */
 export const render = async (url, query) => {
-  console.log("🔍 SSR Rendering:", { url, query });
-
   try {
-    // 1. URL 매칭
-    const matched = serverRouter.match(url);
+    // 1. Base path 제거
+    const cleanUrl = cleanBasePathFromUrl(url);
+
+    // 2. URL 매칭
+    const matched = serverRouter.match(cleanUrl);
 
     if (!matched) {
-      console.log("❌ No route matched");
       return {
         head: "<title>404 Not Found</title>",
-        appHtml: "<h1>404 - Page Not Found</h1>",
+        appHtml: NotFoundPage(),
       };
     }
 
-    console.log("✅ Route matched:", matched.path, matched.params);
-
-    // 2. Store 초기화 (매 요청마다 리셋)
+    // 2. Store 완전 초기화
     productStore.dispatch({
       type: PRODUCT_ACTIONS.SETUP,
-      payload: initialProductState,
+      payload: {
+        ...initialProductState,
+        loading: false,
+      },
     });
 
-    // 3. 라우트별 데이터 프리페칭
+    // 3. 쿼리 파라미터 병합 및 디코딩
+    const queryParams = ServerRouter.parseQuery(url.split("?")[1] || "");
+    const decodedQuery = decodeQueryParams(queryParams, query);
+
+    // 서버 환경에서 router.query 설정
+    router.setQuery(decodedQuery);
+
+    // 4. 라우트별 데이터 프리페칭
     if (matched.path === "/") {
-      // 홈페이지: 상품 목록 + 카테고리
-      const queryParams = ServerRouter.parseQuery(url.split("?")[1] || "");
-      const mergedQuery = { ...queryParams, ...query };
+      // 홈페이지
 
-      console.log("📦 Loading products with query:", mergedQuery);
+      const queryForAPI = {
+        ...decodedQuery,
+        limit: parseInt(decodedQuery.limit) || 20,
+        page: parseInt(decodedQuery.page || decodedQuery.current) || 1,
+      };
 
-      const [productsData, categories] = await Promise.all([
-        getProductsFromFile({
-          ...mergedQuery,
-          limit: parseInt(mergedQuery.limit) || 20,
-          page: parseInt(mergedQuery.page || mergedQuery.current) || 1,
-        }),
-        getCategoriesFromFile(),
-      ]);
+      const [productsData, categories] = await Promise.all([getProductsFromFile(queryForAPI), getCategoriesFromFile()]);
 
-      // Store에 데이터 저장
       productStore.dispatch({
         type: PRODUCT_ACTIONS.SETUP,
         payload: {
           products: productsData.products,
           totalCount: productsData.pagination.total,
           categories: categories,
+          currentProduct: null,
+          relatedProducts: [],
           loading: false,
           error: null,
           status: "done",
         },
       });
-
-      console.log("✅ Loaded", productsData.products.length, "products");
     } else if (matched.path === "/product/:id/") {
-      // 상품 상세: 특정 상품 + 관련 상품
+      // 상품 상세
       const productId = matched.params.id;
-      console.log("📦 Loading product:", productId);
 
       const product = await getProductByIdFromFile(productId);
 
       if (!product) {
-        console.log("❌ Product not found:", productId);
         return {
-          head: "<title>상품을 찾을 수 없습니다</title>",
-          appHtml: "<h1>상품을 찾을 수 없습니다</h1>",
+          head: "<title>상품을 찾을 수 없습니다 - 쇼핑몰</title>",
+          appHtml: NotFoundPage(),
         };
       }
 
-      // 관련 상품 (같은 category2)
+      // 관련 상품
       let relatedProducts = [];
       if (product.category2) {
         const relatedData = await getProductsFromFile({
@@ -102,120 +133,75 @@ export const render = async (url, query) => {
         relatedProducts = relatedData.products.filter((p) => p.productId !== productId);
       }
 
-      // Store에 데이터 저장
+      const payload = {
+        products: [],
+        totalCount: 0,
+        categories: {},
+        currentProduct: product,
+        relatedProducts: relatedProducts,
+        loading: false,
+        error: null,
+        status: "done",
+      };
+
       productStore.dispatch({
         type: PRODUCT_ACTIONS.SETUP,
-        payload: {
-          currentProduct: product,
-          relatedProducts: relatedProducts,
-          loading: false,
-          error: null,
-          status: "done",
-        },
+        payload,
       });
-
-      console.log("✅ Loaded product:", product.title);
     }
 
-    // 4. HTML 생성 (임시 - Phase 4에서 실제 컴포넌트 사용)
+    // 5. HTML 생성 - 기존 컴포넌트 재사용
     const state = productStore.getState();
-    const htmlContent = generateHTML(matched.path, state, matched.params);
+    let htmlContent = "";
 
-    // 5. 초기 데이터 주입
-    const initialData = productStore.getState();
+    if (matched.path === "/") {
+      // HomePage 컴포넌트 사용 - router.query 설정
+      router.setQuery(decodedQuery);
+      htmlContent = HomePage();
+    } else if (matched.path === "/product/:id/") {
+      // ProductDetailPage 컴포넌트 사용
+      // 서버 환경에서 router.params 설정
+      router.params = matched.params;
+      htmlContent = ProductDetailPage();
+    } else {
+      // 알 수 없는 경로
+      return {
+        head: "<title>404 Not Found</title>",
+        appHtml: NotFoundPage(),
+      };
+    }
+
+    // 6. 초기 데이터 주입
+    // 테스트가 기대하는 순서로 데이터 구성
+    const initialData = {
+      products: state.products || [],
+      totalCount: state.totalCount || 0,
+      currentProduct: state.currentProduct || null,
+      relatedProducts: state.relatedProducts || [],
+      loading: state.loading || false,
+      error: state.error || null,
+      status: state.status || "done",
+      categories: state.categories || {},
+    };
 
     return {
       head: `
-        <title>${matched.path === "/" ? "쇼핑몰 - 상품 목록" : state.currentProduct?.title || "상품 상세"}</title>
+        <title>${matched.path === "/" ? "쇼핑몰 - 홈" : state.currentProduct?.title ? `${state.currentProduct.title} - 쇼핑몰` : "상품 상세"}</title>
         <meta name="description" content="SSR로 렌더링된 쇼핑몰">
+        <!-- DEBUG: ${JSON.stringify({ decodedQuery, hasSearch: !!decodedQuery.search })} -->
       `,
-      appHtml: `
-        ${htmlContent}
+      appHtml: htmlContent,
+      appBody: `
         <script>
           window.__INITIAL_DATA__ = ${JSON.stringify(initialData)};
-          console.log('✅ Initial data injected:', window.__INITIAL_DATA__);
+          window.__DEBUG_QUERY__ = ${JSON.stringify(decodedQuery)};
         </script>
       `,
     };
   } catch (error) {
-    console.error("❌ SSR Error:", error);
     return {
       head: "<title>Error</title>",
       appHtml: `<h1>Server Error</h1><pre>${error.message}</pre>`,
     };
   }
 };
-
-/**
- * 임시 HTML 생성 함수 (Phase 4에서 실제 컴포넌트로 교체)
- */
-function generateHTML(path, state) {
-  if (path === "/") {
-    // 홈페이지
-    return `
-      <div id="root">
-        <div class="container mx-auto p-4">
-          <h1 class="text-2xl font-bold mb-4">쇼핑몰 - SSR 테스트</h1>
-          <p class="mb-4">총 ${state.totalCount}개의 상품</p>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            ${state.products
-              .map(
-                (product) => `
-              <div class="border p-4 rounded">
-                <img src="${product.image}" alt="${product.title}" class="w-full h-48 object-cover mb-2">
-                <h3 class="font-semibold text-sm mb-1">${product.title.substring(0, 30)}...</h3>
-                <p class="text-blue-600 font-bold">${parseInt(product.lprice).toLocaleString()}원</p>
-                <a href="/product/${product.productId}/" class="text-sm text-blue-500 hover:underline">상세보기</a>
-              </div>
-            `,
-              )
-              .join("")}
-          </div>
-        </div>
-      </div>
-    `;
-  } else if (path === "/product/:id/") {
-    // 상품 상세
-    const product = state.currentProduct;
-    return `
-      <div id="root">
-        <div class="container mx-auto p-4">
-          <a href="/" class="text-blue-500 hover:underline mb-4 inline-block">← 목록으로</a>
-          <div class="bg-white rounded-lg shadow p-6">
-            <img src="${product.image}" alt="${product.title}" class="w-full h-96 object-cover mb-4">
-            <h1 class="text-2xl font-bold mb-2">${product.title}</h1>
-            <p class="text-sm text-gray-600 mb-2">${product.brand}</p>
-            <p class="text-3xl text-blue-600 font-bold mb-4">${parseInt(product.lprice).toLocaleString()}원</p>
-            <p class="text-gray-700">카테고리: ${product.category1} > ${product.category2}</p>
-          </div>
-          
-          ${
-            state.relatedProducts.length > 0
-              ? `
-            <div class="mt-8">
-              <h2 class="text-xl font-bold mb-4">관련 상품 (${state.relatedProducts.length}개)</h2>
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                ${state.relatedProducts
-                  .slice(0, 8)
-                  .map(
-                    (p) => `
-                  <div class="border p-4 rounded">
-                    <img src="${p.image}" alt="${p.title}" class="w-full h-32 object-cover mb-2">
-                    <h3 class="text-sm font-semibold">${p.title.substring(0, 20)}...</h3>
-                    <p class="text-blue-600">${parseInt(p.lprice).toLocaleString()}원</p>
-                  </div>
-                `,
-                  )
-                  .join("")}
-              </div>
-            </div>
-          `
-              : ""
-          }
-        </div>
-      </div>
-    `;
-  }
-
-  return "<div>Unknown route</div>";
-}
