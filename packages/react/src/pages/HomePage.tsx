@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { loadNextProducts, loadProductsAndCategories, ProductList, SearchBar } from "../entities";
+import { loadNextProducts, loadProductsAndCategories, ProductList, SearchBar, useProductStore } from "../entities";
 import { PageWrapper } from "./PageWrapper";
 
 const headerLeft = (
@@ -27,12 +27,21 @@ const unregisterScrollHandler = () => {
 };
 
 export const HomePage = () => {
+  const { products, status } = useProductStore();
+
   useEffect(() => {
     registerScrollHandler();
+
+    // Hydration 체크: 이미 데이터가 있으면 스킵 (SSR로 로드된 데이터)
+    if (products.length > 0 && status === "done") {
+      return;
+    }
+
+    // 데이터 없으면 로드 (CSR)
     loadProductsAndCategories();
 
     return unregisterScrollHandler;
-  }, []);
+  }, [products.length, status]);
 
   return (
     <PageWrapper headerLeft={headerLeft}>

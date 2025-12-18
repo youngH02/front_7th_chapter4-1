@@ -3,6 +3,7 @@ import { PublicImage } from "../../../components";
 import { useProductStore } from "../hooks";
 import { useProductFilter } from "./hooks";
 import { searchProducts, setCategory, setLimit, setSort } from "../productUseCase";
+import { router } from "../../../router";
 
 const OPTION_LIMITS = [10, 20, 50, 100];
 const OPTION_SORTS = [
@@ -91,6 +92,11 @@ export function SearchBar() {
   const { categories } = useProductStore();
   const { searchQuery, limit = "20", sort, category } = useProductFilter();
 
+  // SSR을 위해 router.query에서도 직접 읽기 (서버 환경에서만)
+  const ssrSearchQuery = router.query.search || searchQuery || "";
+  const ssrLimit = router.query.limit || limit || "20";
+  const ssrSort = router.query.sort || sort || "price_asc";
+
   const categoryList = Object.keys(categories).length > 0 ? Object.keys(categories) : [];
   const limitOptions = OPTION_LIMITS.map((value) => (
     <option key={value} value={value}>
@@ -124,7 +130,7 @@ export function SearchBar() {
             type="text"
             id="search-input"
             placeholder="상품명을 검색해보세요..."
-            defaultValue={searchQuery}
+            defaultValue={ssrSearchQuery}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg
                         focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             onKeyDown={handleSearchKeyDown}
@@ -232,7 +238,7 @@ export function SearchBar() {
               id="limit-select"
               className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               onChange={handleLimitChange}
-              defaultValue={Number(limit)}
+              defaultValue={Number(ssrLimit)}
             >
               {limitOptions}
             </select>
@@ -248,7 +254,7 @@ export function SearchBar() {
               className="text-sm border border-gray-300 rounded px-2 py-1
                            focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               onChange={handleSortChange}
-              defaultValue={sort}
+              defaultValue={ssrSort}
             >
               {sortOptions}
             </select>

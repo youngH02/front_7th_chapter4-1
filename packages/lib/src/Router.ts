@@ -19,32 +19,42 @@ export class Router<Handler extends (...args: any[]) => any> {
   readonly #baseUrl;
 
   #route: null | (Route<Handler> & { params: StringRecord; path: string });
+  #serverQuery: StringRecord | null = null;
 
   constructor(baseUrl = "") {
     this.#routes = new Map();
     this.#route = null;
     this.#baseUrl = baseUrl.replace(/\/$/, "");
 
-    window.addEventListener("popstate", () => {
-      this.#route = this.#findRoute();
-      this.#observer.notify();
-    });
+    // 클라이언트 환경에서만 이벤트 리스너 등록
+    if (typeof window !== "undefined") {
+      window.addEventListener("popstate", () => {
+        this.#route = this.#findRoute();
+        this.#observer.notify();
+      });
+    }
 
-    document.addEventListener("click", (e) => {
-      const target = e.target as HTMLElement;
-      if (!target?.closest("[data-link]")) {
-        return;
-      }
-      e.preventDefault();
-      const url = target.getAttribute("href") ?? target.closest("[data-link]")?.getAttribute("href");
-      if (url) {
-        this.push(url);
-      }
-    });
+    if (typeof document !== "undefined") {
+      document.addEventListener("click", (e) => {
+        const target = e.target as HTMLElement;
+        if (!target?.closest("[data-link]")) {
+          return;
+        }
+        e.preventDefault();
+        const url = target.getAttribute("href") ?? target.closest("[data-link]")?.getAttribute("href");
+        if (url) {
+          this.push(url);
+        }
+      });
+    }
   }
 
   get query(): StringRecord {
-    return Router.parseQuery(window.location.search);
+    // 서버 환경에서는 설정된 쿼리 사용
+    if (this.#serverQuery !== null) {
+      return this.#serverQuery;
+    }
+    return Router.parseQuery(typeof window !== "undefined" ? window.location.search : "");
   }
 
   set query(newQuery: QueryPayload) {
@@ -85,8 +95,17 @@ export class Router<Handler extends (...args: any[]) => any> {
     });
   }
 
-  #findRoute(url = window.location.pathname) {
-    const { pathname } = new URL(url, window.location.origin);
+  #findRoute(url = typeof window !== "undefined" ? window.location.pathname : "/") {
+    let pathname: string;
+
+    if (typeof window !== "undefined") {
+      const urlObj = new URL(url, window.location.origin);
+      pathname = urlObj.pathname;
+    } else {
+      // 서버 환경에서는 URL을 직접 파싱
+      pathname = url.split("?")[0];
+    }
+
     for (const [routePath, route] of this.#routes) {
       const match = pathname.match(route.regex);
       if (match) {
@@ -107,6 +126,13 @@ export class Router<Handler extends (...args: any[]) => any> {
   }
 
   push(url: string) {
+    if (typeof window === "undefined") {
+      // 서버 환경에서는 히스토리 조작 없이 라우트만 설정
+      this.#route = this.#findRoute(url);
+      this.#observer.notify();
+      return;
+    }
+
     try {
       // baseUrl이 없으면 자동으로 붙여줌
       const fullUrl = url.startsWith(this.#baseUrl) ? url : this.#baseUrl + (url.startsWith("/") ? url : "/" + url);
@@ -130,7 +156,40 @@ export class Router<Handler extends (...args: any[]) => any> {
     this.#observer.notify();
   }
 
-  static parseQuery = (search = window.location.search) => {
+  // 서버 사이드에서 현재 경로를 설정하는 메서드
+  setCurrentPath(path: string) {
+    // 서버 환경에서는 window가 없으므로 직접 route를 설정
+    this.#route = this.#findRouteForPath(path);
+    this.#observer.notify();
+  }
+
+  // 서버 사이드에서 쿼리 파라미터를 설정하는 메서드
+  setServerQuery(query: StringRecord) {
+    this.#serverQuery = query;
+    this.#observer.notify();
+  }
+
+  // 서버 사이드에서 경로를 찾는 헬퍼 메서드
+  #findRouteForPath(path: string): (Route<Handler> & { params: StringRecord; path: string }) | null {
+    for (const [routePath, route] of this.#routes) {
+      const match = path.match(route.regex);
+      if (match) {
+        const params: StringRecord = {};
+        route.paramNames.forEach((name, i) => {
+          params[name] = match[i + 1];
+        });
+
+        return {
+          ...route,
+          params,
+          path: routePath,
+        };
+      }
+    }
+    return null;
+  }
+
+  static parseQuery = (search = typeof window !== "undefined" ? window.location.search : "") => {
     const params = new URLSearchParams(search);
     const query: StringRecord = {};
     for (const [key, value] of params) {
@@ -161,6 +220,12 @@ export class Router<Handler extends (...args: any[]) => any> {
     });
 
     const queryString = Router.stringifyQuery(updatedQuery);
-    return `${baseUrl}${window.location.pathname.replace(baseUrl, "")}${queryString ? `?${queryString}` : ""}`;
+
+    if (typeof window !== "undefined") {
+      return `${baseUrl}${window.location.pathname.replace(baseUrl, "")}${queryString ? `?${queryString}` : ""}`;
+    } else {
+      // 서버 환경에서는 기본 URL 반환
+      return `${baseUrl}/${queryString ? `?${queryString}` : ""}`;
+    }
   };
 }
