@@ -1,1 +1,0 @@
-import{c as e,d as t,e as n}from"./mockUtils-DnnXh5vH.js";const r={getProducts:e=>Promise.resolve(t(e)),getProduct:t=>Promise.resolve(e(t)),getCategories:()=>Promise.resolve(n()),getRelatedProducts:async(e,t)=>{let{products:n}=await r.getProducts({category2:t,limit:20});return n.filter(t=>t.productId!==e)}};export{r as productService};
